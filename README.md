@@ -21,7 +21,7 @@ pip install -e .
 
 BOA-Guard needs three parameters to authenticate against your FHIR server.
 They are read from environment variables, so the easiest way is to place a
-.env file next to where you run the commands like [this](.env_sample).
+`.env` file next to where you run the commands. See the [sample](.env_sample):
 
 ```txt
 FHIR_URL=https://fhir.example.org/fhir
@@ -29,7 +29,7 @@ FHIR_USER=Username
 FHIR_PWD=SecretPassword
 ```
 
-An alternative way is to export the environment variables so no .env file is needed.
+Alternatively, you can export the variables directly in your shell:
 
 ```bash
 export FHIR_URL="https://fhir.example.org/fhir"
