@@ -1,0 +1,93 @@
+[build-system]
+build-backend = "poetry.core.masonry.api"
+
+requires = [ "poetry-core>=2,<3" ]
+
+[project]
+name = "boa-guard"
+version = "0.1.0"
+description = "Transform BOA results into the corresponding FHIR profiles"
+readme = "README.md"
+authors = [
+  { name = "Jannis Straus", email = "jannis.straus@uk-essen.de" },
+]
+requires-python = ">=3.10,<4.0"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "pandas>=2.2.3,<3",
+  "pydicom>=3.0.1,<4",
+  "python-dotenv>=1.1,<2",
+  "tqdm>=4.67.1,<5",
+]
+
+scripts.boa-guard = "boa_guard.__main__:main"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+poetry-plugin-export = "^1.9.0"
+pytest = "^8.3.5"
+
+[tool.ruff]
+target-version = "py310"
+
+# Same as Black
+line-length = 88
+lint.select = [
+  "B", # flake8-bugbear
+  "C", # flake8-comprehensions
+  # "D",    # pydocstyle
+  "D401", # First line of docstring should be in imperative mood
+  "E",    # pycodestyle errors
+  "EXE",  # flake8-executable
+  "F",    # pyflakes
+  "I",    # isort
+  "PL",   # pylint
+  "RUF",  # ruff
+  "W",    # pycodestyle warnings
+]
+lint.ignore = [
+  "D100",    # Missing docstring in public module
+  "D101",    # Missing docstring in public class
+  "D104",    # Missing docstring in public package
+  "D105",    # Missing docstring in magic method
+  "E501",    # line too long, handled by black
+  "PLR2004", # Magic value used in comparison, consider replacing # with a constant variable
+]
+lint.unfixable = [
+  "F401", # Do not fix unused imports, it's annoying during development
+]
+lint.pydocstyle.convention = "google"
+
+[tool.pytest.ini_options]
+log_level = "INFO"
+
+[tool.mypy]
+# Ensure full coverage
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+
+# Restrict dynamic typing
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_return_any = true
+
+# Know exactly what you're doing
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+warn_unreachable = true
+show_error_codes = true
+
+[tool.sqlfluff.core]
+dialect = "postgres"
+
+[tool.sqlfluff.rules.capitalisation.keywords]
+capitalisation_policy = "upper"

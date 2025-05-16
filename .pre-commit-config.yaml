@@ -1,0 +1,61 @@
+# See https://gitlab.uk-essen.de/ship-ai/pre-commit-hooks for the newest version
+
+repos:
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.11.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        language_version: python3.10
+        additional_dependencies: ["types-pytz"]
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [html, css, json, javascript, xml, yaml]
+        exclude: node_modules
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.5.1
+    hooks:
+      - id: pyproject-fmt
+        types: [toml]
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.18.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--fix]
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 3.4.0
+    hooks:
+      - id: sqlfluff-fix
+        name: sqlfluff-fix
+        entry: sqlfluff fix --show-lint-violations --processes 0 --disable-progress-bar
+        language: python
+        description: Fixes sql lint errors with `SQLFluff`
+        types: [sql]
+        require_serial: true
+        additional_dependencies: []
+
+  - repo: local
+    hooks:
+      - id: poetry-export
+        name: Export requirements.txt with Poetry
+        entry: poetry export -f requirements.txt --without-hashes --without-urls --without dev -o requirements.txt
+        language: system
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-added-large-files
