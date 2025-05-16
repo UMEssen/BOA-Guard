@@ -7,7 +7,6 @@ from typing import Any
 
 import pydicom
 import pytz
-from pytz import BaseTzInfo
 
 logger = logging.getLogger("boa-guard")
 
@@ -468,7 +467,7 @@ def dicom_dt_to_fhir_dt(
     naive_dt = datetime(year, month, day, hour, minute, second, microsecond)
     tz = dicom_offset_to_tzinfo(timezone_offset_str)
 
-    if isinstance(tz, BaseTzInfo):
+    if isinstance(tz, pytz.BaseTzInfo):
         # `pytz` zone: use its safer `localize`
         localized_dt = tz.localize(naive_dt)
     else:
