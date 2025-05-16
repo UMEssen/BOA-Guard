@@ -20,10 +20,10 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "pandas>=2.2.3,<3",
   "pydicom>=3.0.1,<4",
   "python-dotenv>=1.1,<2",
-  "tqdm>=4.67.1,<5",
+  "pytz>=2025.2,<2026",
+  "requests>=2.32.3,<3",
 ]
 
 scripts.boa-guard = "boa_guard.__main__:main"

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import datetime, tzinfo
 from pathlib import Path
 from typing import Any
@@ -8,46 +9,67 @@ import pydicom
 import pytz
 from pytz import BaseTzInfo
 
-from boa_guard.utils import StrPath, iterator
+logger = logging.getLogger("boa-guard")
 
 
-def main(input_dir: StrPath, output_dir: StrPath) -> None:
-    input_dir = Path(input_dir)
-    output_dir = Path(output_dir)
-    for folder in iterator(input_dir):
-        create_bundles(folder, output_dir)
+def main(fhir_folder: Path, boa_folder: Path) -> None:
+    json_output = fhir_folder / "fhir-bundles.json"
+    result_dict: list[dict[str, Any]] = []
+    for folder in boa_folder.rglob("*.xlsx"):
+        try:
+            result_dict.extend(create_bundles(folder.parent, fhir_folder))
+        except (FileNotFoundError, NotADirectoryError) as e:
+            logger.warning(f"{type(e).__name__}: {e}")
+
+    fhir_folder.mkdir(exist_ok=True)
+    with json_output.open("w", encoding="utf-8") as f:
+        json.dump(result_dict, f, indent=2)
+    logger.info(f"Successfully created FHIR bundles in '{fhir_folder}'")
 
 
-def create_bundles(folder: Path, output_dir: Path, overwrite: bool = True) -> None:
-    json_output = output_dir / "fhir-bundles.json"
-
-    if json_output.is_file() and not overwrite:
-        return
-
+def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:
     json_bca = folder / "bca-measurements.json"
     json_total = folder / "total-measurements.json"
     dicom_path = folder / "dicoms"
     bca_dict: dict[str, Any] = {}
     total_dict: dict[str, Any] = {}
     dicom_dict: dict[str, Any] = {}
-    result_dict: list[dict[str, Any]] = []
 
-    if json_bca.is_file():
-        with json_bca.open() as f:
-            bca_dict = json.load(f)
-        bca_dict = bca_dict["aggregated"]
+    if not json_bca.is_file() or not json_total.is_file():
+        raise FileNotFoundError(
+            f"'{json_bca.name}' or '{json_total.name}' is missing in '{folder}'. "
+            "Without the JSON files the FHIR bundles can't be generated for this Patient."
+        )
+    elif not dicom_path.is_dir():
+        raise NotADirectoryError(
+            f"Folder '{dicom_path.name}' is missing in '{folder}'. "
+            "Without the DICOM files the FHIR bundles can't be generated for this Patient."
+        )
 
-    if json_total.is_file():
-        with json_total.open() as f:
-            total_dict = json.load(f)
+    with json_bca.open(encoding="utf-8") as f:
+        bca_dict = json.load(f)
+    bca_dict = bca_dict["aggregated"]
+
+    with json_total.open(encoding="utf-8") as f:
+        total_dict = json.load(f)
         total_dict = total_dict["segmentations"]["total"]
 
-    if dicom_path.is_dir():
-        dicom_dict = get_dicom_tags(dicom_path)
+    dicom_dict = get_dicom_tags(dicom_path)
 
-    result_dict.extend(to_fhir_bundles(bca_dict, total_dict, dicom_dict))
-    with json_output.open("w", encoding="utf-8") as f:
-        json.dump(result_dict, f, indent=2)
+    return to_fhir_bundles(bca_dict, total_dict, dicom_dict)
+
+
+def to_fhir_bundles(
+    bca_dict: dict[str, Any], total_dict: dict[str, Any], dicom_dict: dict[str, str]
+) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+
+    result.append(get_imaging_study(dicom_dict))
+    result.extend(get_bca_observation(bca_dict, dicom_dict, False))
+    result.extend(get_bca_observation(bca_dict, dicom_dict, True))
+    result.append(get_bsv_observation(total_dict, dicom_dict))
+
+    return result
 
 
 def get_dicom_tags(dicom_path: Path) -> dict[str, Any]:
@@ -89,11 +111,11 @@ def get_dicom_tags(dicom_path: Path) -> dict[str, Any]:
     else:
         result["ImageID"] = "TODO"
     # Started
-    result["Started"] = dicom_datetime_to_fhir(
+    result["Started"] = dicom_dt_to_fhir_dt(
         result["StudyDate"], result["StudyTime"], result["TimezoneOffsetFromUTC"]
     )
     # Effective
-    result["Effective"] = dicom_datetime_to_fhir(
+    result["Effective"] = dicom_dt_to_fhir_dt(
         result["AcquisitionDate"],
         result["AcquisitionTime"],
         result["TimezoneOffsetFromUTC"],
@@ -110,19 +132,6 @@ def get_dicom_tags(dicom_path: Path) -> dict[str, Any]:
     return {k if k is not None else "TODO": v for k, v in result.items()}
 
 
-def to_fhir_bundles(
-    bca_dict: dict[str, Any], total_dict: dict[str, Any], dicom_dict: dict[str, str]
-) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-
-    result.append(get_imaging_study(dicom_dict))
-    result.extend(get_bca_observation(bca_dict, dicom_dict, False))
-    result.extend(get_bca_observation(bca_dict, dicom_dict, True))
-    result.append(get_bsv_observation(total_dict, dicom_dict))
-
-    return result
-
-
 # BOAImagingStudy
 def get_imaging_study(dicom_dict: dict[str, str]) -> dict[str, Any]:
     result_dict = {
@@ -132,7 +141,7 @@ def get_imaging_study(dicom_dict: dict[str, str]) -> dict[str, Any]:
                 "value": f"urn:oid:{dicom_dict['StudyInstanceUID']}",
             },
             "status": "available",
-            "subject": dicom_dict["PatientID"],
+            "subject": {"reference": f"Patient/{dicom_dict['PatientID']}"},
             "started": dicom_dict["Started"],
             "numberOfSeries": 1,
             "series": [
@@ -204,30 +213,36 @@ def get_bca_observation(
                     "code": bv["body_site"],
                 },
                 "derivedFrom": dicom_dict["ImageID"],
-                "component:sliceRange": {
-                    "code.coding": {
-                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/slice-range",
-                        "code": "axial-slice-range",
-                        "display": f"{bca_dict[bk]['min_slice_idx']} - {bca_dict[bk]['max_slice_idx']}",
+                "component": [
+                    {
+                        "sliceRange": {
+                            "code.coding": {
+                                "system": "https://uk-essen.de/fhir/CodeSystem/boa/slice-range",
+                                "code": "axial-slice-range",
+                                "display": f"{bca_dict[bk]['min_slice_idx']} - {bca_dict[bk]['max_slice_idx']}",
+                            },
+                            "value": {
+                                "low.value": bca_dict[bk]["min_slice_idx"],
+                                "high.value": bca_dict[bk]["max_slice_idx"],
+                            },
+                        }
                     },
-                    "value": {
-                        "low.value": bca_dict[bk]["min_slice_idx"],
-                        "high.value": bca_dict[bk]["max_slice_idx"],
-                    },
-                },
-                **{
-                    f"component:{tk}": {
-                        "code.coding": {
-                            "system": "https://uk-essen.de/fhir/ValueSet/boa/tissues",
-                            "code": tv,
-                        },
-                        "value": {
-                            "value": bca_dict[bk][measurements][tk]["sum"],
-                            "unit": "ml",
-                        },
-                    }
-                    for tk, tv in tissue_coding_dict.items()
-                },
+                    *[
+                        {
+                            tk: {
+                                "code.coding": {
+                                    "system": "https://uk-essen.de/fhir/ValueSet/boa/tissues",
+                                    "code": tv,
+                                },
+                                "value": {
+                                    "value": f"{bca_dict[bk][measurements][tk]['sum']:.2f}",
+                                    "unit": "ml",
+                                },
+                            }
+                        }
+                        for tk, tv in tissue_coding_dict.items()
+                    ],
+                ],
             }
         }
         for bk, bv in bca_coding_dict.items()
@@ -354,19 +369,21 @@ def get_bsv_observation(
             "subject": dicom_dict["PatientID"],
             "effective": dicom_dict["Effective"],
             "derivedFrom": dicom_dict["ImageID"],
-            **{
-                f"component:{k}": {
-                    "code.coding": {
-                        "system": "https://uk-essen.de/fhir/ValueSet/boa/body-structure",
-                        "code": total_coding_dict[k],
-                    },
-                    "value": {
-                        "value": v["volume_ml"] if v["present"] else 0.0,
-                        "unit": "ml",
-                    },
+            "component": [
+                {
+                    k: {
+                        "code.coding": {
+                            "system": "https://uk-essen.de/fhir/ValueSet/boa/body-structure",
+                            "code": total_coding_dict[k],
+                        },
+                        "value": {
+                            "value": f"{v['volume_ml']:.2f}" if v["present"] else 0.0,
+                            "unit": "ml",
+                        },
+                    }
                 }
                 for k, v in total_dict.items()
-            },
+            ],
         }
     }
 
@@ -412,7 +429,7 @@ def name_mapping(keys: list[str], total_dict: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def parse_dicom_timezone_offset(offset_str: str | None) -> tzinfo:
+def dicom_offset_to_tzinfo(offset_str: str | None) -> tzinfo:
     if offset_str and len(offset_str) == 5 and offset_str[0] in {"+", "-"}:
         try:
             sign = 1 if offset_str[0] == "+" else -1
@@ -426,15 +443,14 @@ def parse_dicom_timezone_offset(offset_str: str | None) -> tzinfo:
     return pytz.timezone("Europe/Berlin")
 
 
-def dicom_datetime_to_fhir(
+def dicom_dt_to_fhir_dt(
     dicom_date: str | None,
     dicom_time: str | None = None,
     timezone_offset_str: str | None = None,
 ) -> str:
     if not dicom_date:
-        return "TODO"  # Cannot proceed without date
+        return "TODO"
 
-    # Parse the date
     year = int(dicom_date[0:4])
     month = int(dicom_date[4:6])
     day = int(dicom_date[6:8])
@@ -449,9 +465,8 @@ def dicom_datetime_to_fhir(
     else:
         hour = minute = second = microsecond = 0
 
-    # Create a naive datetime object
     naive_dt = datetime(year, month, day, hour, minute, second, microsecond)
-    tz = parse_dicom_timezone_offset(timezone_offset_str)
+    tz = dicom_offset_to_tzinfo(timezone_offset_str)
 
     if isinstance(tz, BaseTzInfo):
         # `pytz` zone: use its safer `localize`

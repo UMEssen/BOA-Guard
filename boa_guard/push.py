@@ -1,5 +1,5 @@
 from pathlib import Path
 
 
-def main(path: Path) -> None:
+def main(fhir_dir: Path) -> None:
     raise NotImplementedError()
