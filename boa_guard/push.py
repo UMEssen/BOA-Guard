@@ -35,7 +35,7 @@ def post_transactions(
 
     with json_logs.open("w", encoding="utf-8") as f:
         json.dump(resp.json(), f, indent=2)
-    logger.info(f"FHIR response saved to '{json_logs}'.")
+    logger.info(f"FHIR response saved in '{json_logs}'.")
     resp.raise_for_status()
 
 
