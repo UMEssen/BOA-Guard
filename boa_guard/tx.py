@@ -38,7 +38,7 @@ def create_transactions(bundle_dict: list[dict[str, Any]]) -> dict[str, Any]:
             # "fullUrl": entry.get("fullUrl", f"urn:uuid:{resource_id}"),
             "resource": resource_entry,
             "request": {
-                "method": "PUT",  # "PUT" or "POST" if you're creating new resources
+                "method": "POST",  # "PUT" or "POST" if you're creating new resources
                 "url": f"{resource_type}/{generate_hash(32)}",
             },
         }
