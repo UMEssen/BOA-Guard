@@ -2,12 +2,13 @@ import hashlib
 import json
 import logging
 from datetime import datetime, tzinfo
-from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
 import pydicom
 import pytz
+
+from boa_guard.mapping_dict import mapping_dict
 
 logger = logging.getLogger("boa-guard")
 
@@ -30,7 +31,6 @@ def main(fhir_folder: Path, boa_folder: Path) -> None:
 def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:
     json_bca = folder / "bca-measurements.json"
     json_total = folder / "total-measurements.json"
-    json_mapping = files(__package__).joinpath("mapping.json")
     dicom_path = folder / "dicoms"
     bca_dict: dict[str, Any] = {}
     total_dict: dict[str, Any] = {}
@@ -53,9 +53,6 @@ def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:
     with json_total.open(encoding="utf-8") as f:
         total_dict = json.load(f)["segmentations"]["total"]
 
-    with json_mapping.open(encoding="utf-8") as f:
-        mapping_dict: dict[str, dict[str, Any]] = json.load(f)
-
     dicom_dict = get_dicom_tags(dicom_path)
 
     return to_fhir_bundles(bca_dict, total_dict, mapping_dict, dicom_dict)
@@ -70,9 +67,9 @@ def to_fhir_bundles(
     result: list[dict[str, Any]] = []
 
     result.append(get_imaging_study(dicom_dict))
-    result.extend(get_bca_observation(bca_dict, mapping_dict, dicom_dict, False))
-    result.extend(get_bca_observation(bca_dict, mapping_dict, dicom_dict, True))
-    result.append(get_bsv_observation(total_dict, mapping_dict, dicom_dict))
+    result.extend(get_bca_observation(bca_dict, dicom_dict, False))
+    result.extend(get_bca_observation(bca_dict, dicom_dict, True))
+    result.append(get_bsv_observation(total_dict, dicom_dict))
 
     return result
 
@@ -177,7 +174,6 @@ def get_imaging_study(dicom_dict: dict[str, str]) -> dict[str, Any]:
 # BOABodyCompositionAnalysisObservation
 def get_bca_observation(
     bca_dict: dict[str, Any],
-    mapping_dict: dict[str, dict[str, Any]],
     dicom_dict: dict[str, Any],
     without_extremeties: bool,
 ) -> list[dict[str, Any]]:
@@ -240,6 +236,7 @@ def get_bca_observation(
                                     {
                                         "system": "https://uk-essen.de/fhir/ValueSet/boa/tissues",
                                         "code": tv,
+                                        "display": tk,
                                     },
                                 ]
                             },
@@ -261,7 +258,6 @@ def get_bca_observation(
 # BOABodyStructureVolumeObservation
 def get_bsv_observation(
     total_dict: dict[str, Any],
-    mapping_dict: dict[str, dict[str, Any]],
     dicom_dict: dict[str, Any],
 ) -> dict[str, Any]:
     total_coding_dict = mapping_dict["total"]
@@ -279,6 +275,7 @@ def get_bsv_observation(
                         "coding": {
                             "system": "https://uk-essen.de/fhir/ValueSet/boa/body-structure",
                             "code": total_coding_dict[k],
+                            "display": k,
                         },
                     },
                     "value": {
