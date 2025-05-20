@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ logger = logging.getLogger("boa-guard")
 
 
 def post_transactions(
-    url: str, user: str, pwd: str, json_tx: Path, txt_logs: Path
+    url: str, user: str, pwd: str, json_tx: Path, json_logs: Path
 ) -> None:
     url, user, pwd = (
         os.environ["FHIR_URL"],
@@ -27,21 +28,21 @@ def post_transactions(
         timeout=30,
     )
 
-    with txt_logs.open("w", encoding="utf-8") as f:
-        f.write(resp.text)
-    logger.info(f"FHIR response saved to '{txt_logs}'.")
-
     if resp.ok:
         logger.info(f"Successfully pushed FHIR transactions to '{url}'.")
     else:
         logger.error(f"An error occured while pushing FHIR transactions to '{url}'.")
-        resp.raise_for_status()
+
+    with json_logs.open("w", encoding="utf-8") as f:
+        json.dump(resp.json(), f, indent=2)
+    logger.info(f"FHIR response saved to '{json_logs}'.")
+    resp.raise_for_status()
 
 
 def main(fhir_folder: Path) -> None:
     env_vars = ("FHIR_URL", "FHIR_USER", "FHIR_PWD")
     json_tx = fhir_folder / "transaction_bundles.json"
-    txt_logs = fhir_folder / "response.txt"
+    json_logs = fhir_folder / "response.json"
 
     if not json_tx.is_file():
         logger.warning(
@@ -60,5 +61,5 @@ def main(fhir_folder: Path) -> None:
         os.environ["FHIR_USER"],
         os.environ["FHIR_PWD"],
         json_tx,
-        txt_logs,
+        json_logs,
     )
