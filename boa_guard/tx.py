@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from boa_guard.utils import generate_hash
+
 logger = logging.getLogger("boa-guard")
 
 
@@ -12,8 +14,9 @@ def main(fhir_folder: Path) -> None:
 
     if not json_bundle.is_file():
         logger.warning(
-            f"FHIR bundles are missing in '{fhir_folder}'. Execute "
-            "`boa-guard bundles -f FHIR_FOLDER -b BOA_FOLDER` to generate the FHIR bundles."
+            f"FHIR bundles are missing in '{fhir_folder}'. Run "
+            "`boa-guard bundles -f FHIR_FOLDER -b BOA_FOLDER` to "
+            "generate the FHIR bundles."
         )
         return
 
@@ -23,7 +26,7 @@ def main(fhir_folder: Path) -> None:
 
     with json_output.open("w", encoding="utf-8") as f:
         json.dump(transaction_dict, f, indent=2)
-    logger.info(f"Successfully created FHIR transactions in '{fhir_folder}'")
+    logger.info(f"Successfully created FHIR transactions in '{fhir_folder}'.")
 
 
 def create_transactions(bundle_dict: list[dict[str, Any]]) -> dict[str, Any]:
@@ -35,8 +38,8 @@ def create_transactions(bundle_dict: list[dict[str, Any]]) -> dict[str, Any]:
             # "fullUrl": entry.get("fullUrl", f"urn:uuid:{resource_id}"),
             "resource": resource_entry,
             "request": {
-                "method": "PUT",  # or "POST" if you're creating new resources
-                "url": f"{resource_type}/example",  # TODO {resource_entry['id']}",
+                "method": "PUT",  # "PUT" or "POST" if you're creating new resources
+                "url": f"{resource_type}/{generate_hash(32)}",
             },
         }
         transaction_entries.append(transaction_entry)

@@ -18,12 +18,12 @@ def main(fhir_folder: Path, boa_folder: Path) -> None:
         try:
             result_dict.extend(create_bundles(folder.parent, fhir_folder))
         except (FileNotFoundError, NotADirectoryError) as e:
-            logger.warning(f"{type(e).__name__}: {e}")
+            logger.warning(f"{type(e).__name__}: {e}.")
 
     fhir_folder.mkdir(exist_ok=True)
     with json_output.open("w", encoding="utf-8") as f:
         json.dump(result_dict, f, indent=2)
-    logger.info(f"Successfully created FHIR bundles in '{fhir_folder}'")
+    logger.info(f"Successfully created FHIR bundles in '{fhir_folder}'.")
 
 
 def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:

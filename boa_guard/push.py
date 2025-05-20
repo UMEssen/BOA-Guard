@@ -1,8 +1,6 @@
-import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
 
 import requests
 import requests.auth
@@ -10,76 +8,57 @@ import requests.auth
 logger = logging.getLogger("boa-guard")
 
 
-# Experimental
-def _log_failure(resp: requests.Response) -> None:
-    """Log only the pieces that help to debug an HTTP error."""
-    logger.error(
-        f"{resp.request.method} {resp.url} -> {resp.status_code} {resp.reason}"
+def post_transactions(
+    url: str, user: str, pwd: str, json_tx: Path, txt_logs: Path
+) -> None:
+    url, user, pwd = (
+        os.environ["FHIR_URL"],
+        os.environ["FHIR_USER"],
+        os.environ["FHIR_PWD"],
     )
-
-    # surface correlation IDs, validators often include one of these
-    for h in ("X-Request-Id", "Correlation-Id", "ETag", "Last-Modified"):
-        if h in resp.headers:
-            logger.error("%s: %s", h, resp.headers[h])
-
-    # FHIR servers usually return OperationOutcome on problems
-    try:
-        payload: Any = resp.json()
-    except ValueError:
-        payload = resp.text
-
-    if isinstance(payload, dict) and payload.get("resourceType") == "OperationOutcome":
-        for issue in payload.get("issue", []):
-            logger.error(
-                "OperationOutcome %s: %s",
-                issue.get("severity", "<unknown>"),
-                issue.get("diagnostics")
-                or issue.get("details", {}).get("text", "<no details>"),
-            )
-    else:
-        logger.error("Body: %s", str(payload))
-
-
-def post_transactions(json_tx: Path) -> None:
-    with json_tx.open(encoding="utf-8") as f:
-        tx_dict = json.load(f)
-
-    headers = {
-        "Content-Type": "application/fhir+json",
-        "Accept": "application/fhir+json",
-    }
+    headers = {"Content-Type": "application/fhir+json"}
+    data = json_tx.read_bytes()
 
     resp = requests.post(
-        os.environ["FHIR_URL"],
-        data=tx_dict,
+        url,
+        data=data,
         headers=headers,
-        auth=requests.auth.HTTPBasicAuth(
-            os.environ["FHIR_USER"], os.environ["FHIR_PWD"]
-        ),
+        auth=requests.auth.HTTPBasicAuth(user, pwd),
+        timeout=30,
     )
 
+    with txt_logs.open("w", encoding="utf-8") as f:
+        f.write(resp.text)
+    logger.info(f"FHIR response saved to '{txt_logs}'.")
+
     if resp.ok:
-        logger.info(
-            f"Successfully pushed FHIR transactions to '{os.environ['FHIR_URL']}'"
-        )
+        logger.info(f"Successfully pushed FHIR transactions to '{url}'.")
     else:
-        _log_failure(resp)
-    resp.raise_for_status()
+        logger.error(f"An error occured while pushing FHIR transactions to '{url}'.")
+        resp.raise_for_status()
 
 
 def main(fhir_folder: Path) -> None:
+    env_vars = ("FHIR_URL", "FHIR_USER", "FHIR_PWD")
     json_tx = fhir_folder / "transaction_bundles.json"
+    txt_logs = fhir_folder / "response.txt"
 
     if not json_tx.is_file():
         logger.warning(
-            f"FHIR transactions are missing in '{fhir_folder}'. Execute "
+            f"FHIR transactions are missing in '{fhir_folder}'. Run "
             "`boa-guard tx -f FHIR_FOLDER` to generate the FHIR bundles."
         )
         return
-    if not all(i in os.environ for i in ["FHIR_URL", "FHIR_USER", "FHIR_PWD"]):
+    if missing := [k for k in env_vars if not os.getenv(k)]:
         logger.error(
-            "Not all environment variables are set. Add 'FHIR_URL', "
-            "'FHIR_USER' and 'FHIR_PWD' to the '.env' file."
+            f"Missing env var(s): {', '.join(missing)}. Add them to your `.env`."
         )
         return
-    post_transactions(json_tx)
+
+    post_transactions(
+        os.environ["FHIR_URL"],
+        os.environ["FHIR_USER"],
+        os.environ["FHIR_PWD"],
+        json_tx,
+        txt_logs,
+    )
