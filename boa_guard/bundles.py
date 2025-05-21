@@ -5,10 +5,12 @@ from datetime import datetime, tzinfo
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 import pydicom
 import pytz
 
 from boa_guard.mapping_dict import mapping_dict
+from boa_guard.utils import generate_hash
 
 logger = logging.getLogger("boa-guard")
 
@@ -16,11 +18,15 @@ logger = logging.getLogger("boa-guard")
 def main(fhir_folder: Path, boa_folder: Path) -> None:
     json_output = fhir_folder / "fhir-bundles.json"
     result_dict: list[dict[str, Any]] = []
-    for folder in boa_folder.rglob("*.xlsx"):
+    # Skip the lock/temp Excel files
+    for excel_file in boa_folder.rglob("[!~$]*.xlsx"):
         try:
-            result_dict.extend(create_bundles(folder.parent, fhir_folder))
+            result_dict.extend(create_bundles(excel_file, excel_file.parent))
         except (FileNotFoundError, NotADirectoryError) as e:
-            logger.warning(f"{type(e).__name__}: {e}")
+            logger.error(
+                "An Error occurred while processing the "
+                f"folder '{excel_file.parent}': {type(e).__name__}: {e}"
+            )
 
     fhir_folder.mkdir(exist_ok=True)
     with json_output.open("w", encoding="utf-8") as f:
@@ -28,13 +34,10 @@ def main(fhir_folder: Path, boa_folder: Path) -> None:
     logger.info(f"Successfully created FHIR bundles in '{fhir_folder}'.")
 
 
-def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:
+def create_bundles(excel_path: Path, folder: Path) -> list[dict[str, Any]]:
     json_bca = folder / "bca-measurements.json"
     json_total = folder / "total-measurements.json"
     dicom_path = folder / "dicoms"
-    bca_dict: dict[str, Any] = {}
-    total_dict: dict[str, Any] = {}
-    dicom_dict: dict[str, Any] = {}
 
     if not json_bca.is_file() or not json_total.is_file():
         raise FileNotFoundError(
@@ -48,33 +51,79 @@ def create_bundles(folder: Path, output_dir: Path) -> list[dict[str, Any]]:
         )
 
     with json_bca.open(encoding="utf-8") as f:
-        bca_dict = json.load(f)["aggregated"]
-
+        bca_dict: dict[str, Any] = json.load(f)["aggregated"]
     with json_total.open(encoding="utf-8") as f:
-        total_dict = json.load(f)["segmentations"]["total"]
-
-    dicom_dict = get_dicom_tags(dicom_path)
-
-    return to_fhir_bundles(bca_dict, total_dict, mapping_dict, dicom_dict)
+        total_dict: dict[str, Any] = json.load(f)["segmentations"]["total"]
+    dicom_dict = get_dicom_dict(dicom_path)
+    info_dict = get_info_dict(excel_path, json_bca, json_total)
+    return to_fhir_bundles(bca_dict, total_dict, dicom_dict, info_dict)
 
 
 def to_fhir_bundles(
     bca_dict: dict[str, Any],
     total_dict: dict[str, Any],
-    mapping_dict: dict[str, Any],
     dicom_dict: dict[str, str],
+    info_dict: dict[str, str],
 ) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
 
-    result.append(get_imaging_study(dicom_dict))
-    result.extend(get_bca_observation(bca_dict, dicom_dict, False))
-    result.extend(get_bca_observation(bca_dict, dicom_dict, True))
-    result.append(get_bsv_observation(total_dict, dicom_dict))
+    imaging_study = get_imaging_study(dicom_dict)
+    observations = [get_bsv_observation(total_dict, dicom_dict)]
+    observations.extend(get_bca_observation(bca_dict, dicom_dict, False))
+    observations.extend(get_bca_observation(bca_dict, dicom_dict, True))
+
+    image_id = imaging_study["ImagingStudy"]["id"]
+    observation_ids = [o["Observation"]["id"] for o in observations]
+    result = [imaging_study, *observations]
+    result.append(
+        get_diagnostic_report(image_id, observation_ids, dicom_dict, info_dict)
+    )
 
     return result
 
 
-def get_dicom_tags(dicom_path: Path) -> dict[str, Any]:
+def get_info_dict(excel_path: Path, json_bca: Path, json_total: Path) -> dict[str, Any]:
+    df = pd.read_excel(
+        excel_path, sheet_name="info", header=None, names=["k", "v"], engine="openpyxl"
+    )
+    df = df[
+        df["k"].isin(
+            {
+                "BOAVersion",
+                "BOAGitHash",
+                "PredictedContrastPhase",
+                "PredictedContrastInGIT",
+            }
+        )
+    ]
+    info_dict: dict[str, Any] = df.set_index("k")["v"].astype(str).to_dict()
+    mapping_dict = {"xlsx": "vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+    info_dict["reports"] = []
+    for name, file in (
+        ("BCA Measurements", json_bca),
+        ("Total Measurements", json_total),
+        ("BOA Excel Report", excel_path),
+        ("BOA PDF Report", excel_path.parent / "report.pdf"),
+    ):
+        if not file.is_file():
+            continue
+        tmp_dict: dict[str, Any] = {}
+        suffix = file.suffix[1:]
+        tmp_dict["contentType"] = f"application/{mapping_dict.get(suffix, suffix)}"
+        tmp_dict["size"] = file.stat().st_size
+        tmp_dict["title"] = name
+        # Hash
+        tmp_dict["hash"] = hashlib.sha1(file.read_bytes()).hexdigest()
+        # Creation
+        ts = getattr(file.stat(), "st_birthtime", file.stat().st_ctime)
+        tmp_dict["creation"] = datetime.fromtimestamp(
+            ts, tz=pytz.timezone("Europe/Berlin")
+        ).isoformat(timespec="milliseconds")
+        info_dict["reports"].append(tmp_dict)
+    return info_dict
+
+
+def get_dicom_dict(dicom_path: Path) -> dict[str, str]:
     dicoms = [
         pydicom.dcmread(f, stop_before_pixels=True) for f in dicom_path.glob("*.dcm")
     ]
@@ -140,8 +189,9 @@ def get_dicom_tags(dicom_path: Path) -> dict[str, Any]:
 
 # BOAImagingStudy
 def get_imaging_study(dicom_dict: dict[str, str]) -> dict[str, Any]:
-    result_dict = {
+    return {
         "ImagingStudy": {
+            "id": generate_hash(32),
             "identifier": [
                 {
                     "system": "urn:dicom:uid",
@@ -168,7 +218,87 @@ def get_imaging_study(dicom_dict: dict[str, str]) -> dict[str, Any]:
             ],
         }
     }
-    return result_dict
+
+
+# BOADiagnosticReport
+def get_diagnostic_report(
+    image_id: str,
+    observation_ids: list[str],
+    dicom_dict: dict[str, str],
+    info_dict: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "DiagnosticReport": {
+            "id": generate_hash(32),
+            "identifier": [
+                {
+                    "type": {
+                        "coding": {
+                            "system": "http://dicom.nema.org/resources/ontology/DCM",
+                            "code": "112002",
+                            "display": "SeriesInstanceUID: A unique identifier for a series of DICOM SOP instances",
+                        }
+                    },
+                    "system": "urn:dicom:uid",
+                    "value": dicom_dict["SeriesInstanceUID"],
+                }
+            ],
+            "status": "preliminary",
+            "category": [
+                {
+                    "coding": {
+                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/git-hash",
+                        "code": info_dict["BOAGitHash"],
+                    },
+                },
+                {
+                    "coding": {
+                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/version",
+                        "code": info_dict["BOAVersion"],
+                    },
+                },
+                {
+                    "coding": {
+                        "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/iv-phase",
+                        "code": info_dict["PredictedContrastPhase"],
+                    },
+                },
+                {
+                    "coding": {
+                        "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/git",
+                        "code": info_dict["PredictedContrastInGIT"],
+                    },
+                },
+            ],
+            "code": {
+                "coding": [
+                    {
+                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/report",
+                        "code": "BOA-Report",
+                    }
+                ],
+            },
+            "subject": {
+                "reference": f"Patient/{dicom_dict['PatientID']}",
+            },
+            "effectiveDateTime": dicom_dict["Effective"],
+            "result": [{"reference": f"Observation/{id}"} for id in observation_ids],
+            "imagingStudy": {
+                "reference": f"ImagingStudy/{image_id}",
+            },
+            "presentedForm": [
+                {
+                    "contentType": i["contentType"],
+                    "url": "TODO",  # TODO
+                    "size": i["size"],
+                    "hash": i["hash"],
+                    "title": i["title"],
+                    "creation": i["creation"],
+                }
+                for i in info_dict["reports"]
+            ],
+        }
+    }
 
 
 # BOABodyCompositionAnalysisObservation
@@ -187,6 +317,7 @@ def get_bca_observation(
     return [
         {
             "Observation": {
+                "id": generate_hash(32),
                 "status": {
                     "value": "preliminary",
                 },
@@ -198,13 +329,14 @@ def get_bca_observation(
                         },
                     ]
                 },
-                "subject": dicom_dict["PatientID"],
+                "subject": {"reference": f"Patient/{dicom_dict['PatientID']}"},
                 "effectiveDateTime": dicom_dict["Effective"],
                 "bodySite": {
                     "coding": [
                         {
                             "system": "https://uk-essen.de/fhir/ValueSet/boa/body-site",
-                            "code": bv["body_site"],
+                            "code": bv,
+                            "display": bk,
                         },
                     ]
                 },
@@ -265,9 +397,10 @@ def get_bsv_observation(
 
     return {
         "Observation": {
+            "id": generate_hash(32),
             "status": "preliminary",
-            "subject": dicom_dict["PatientID"],
-            "effective": dicom_dict["Effective"],
+            "subject": {"reference": f"Patient/{dicom_dict['PatientID']}"},
+            "effectiveDateTime": dicom_dict["Effective"],
             "derivedFrom": dicom_dict["ImageID"],
             "component": [
                 {

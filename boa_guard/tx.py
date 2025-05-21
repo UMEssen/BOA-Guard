@@ -3,8 +3,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from boa_guard.utils import generate_hash
-
 logger = logging.getLogger("boa-guard")
 
 
@@ -38,8 +36,8 @@ def create_transactions(bundle_dict: list[dict[str, Any]]) -> dict[str, Any]:
             # "fullUrl": entry.get("fullUrl", f"urn:uuid:{resource_id}"),
             "resource": resource_entry,
             "request": {
-                "method": "POST",  # "PUT" or "POST" if you're creating new resources
-                "url": f"{resource_type}/{generate_hash(32)}",
+                "method": "PUT",  # "PUT" or "POST" if you're creating new resources
+                "url": f"{resource_type}/{resource_entry['id']}",
             },
         }
         transaction_entries.append(transaction_entry)

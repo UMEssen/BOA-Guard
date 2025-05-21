@@ -108,10 +108,10 @@ mapping_dict: dict[str, dict[str, Any]] = {
         "urinary-bladder": "89837001",
     },
     "bca": {
-        "abdominal_cavity": {"name": "Abdominal Cavity", "body_site": "361473009"},
-        "thoracic_cavity": {"name": "Thoracic Cavity", "body_site": "43799004"},
-        "mediastinum": {"name": "Mediastinum", "body_site": "72410000"},
-        "pericardium": {"name": "Pericardium", "body_site": "76848001"},
+        "abdominal_cavity": "361473009",
+        "thoracic_cavity": "43799004",
+        "mediastinum": "72410000",
+        "pericardium": "76848001",
     },
     "tissues": {
         "bone": "3138006",

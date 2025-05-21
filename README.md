@@ -8,7 +8,7 @@ of BOA results into the corresponding FHIR profiles.
 ## Installation
 
 ```bash
-git clone git@github.com:UMEssen/BOA-Guard.git
+git clone https://github.com/UMEssen/BOA-Guard.git
 cd BOA-Guard
 pip install -e .
 ```
