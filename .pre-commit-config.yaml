@@ -34,18 +34,6 @@ repos:
       - id: markdownlint-cli2
         args: [--fix]
 
-  - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 3.4.0
-    hooks:
-      - id: sqlfluff-fix
-        name: sqlfluff-fix
-        entry: sqlfluff fix --show-lint-violations --processes 0 --disable-progress-bar
-        language: python
-        description: Fixes sql lint errors with `SQLFluff`
-        types: [sql]
-        require_serial: true
-        additional_dependencies: []
-
   - repo: local
     hooks:
       - id: poetry-export

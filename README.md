@@ -20,7 +20,7 @@ pip install -e .
 ## Configuration
 
 BOA-Guard needs three parameters to authenticate against your FHIR server.
-Create a `.env` with key value pairs like in this [sample](.env_sample):
+Create a `.env` File with key value pairs like in this [sample](.env_sample):
 
 ```txt
 FHIR_URL=http://localhost:3000/fhir

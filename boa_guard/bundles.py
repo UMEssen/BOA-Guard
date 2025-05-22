@@ -63,7 +63,7 @@ def to_fhir_bundles(
     bca_dict: dict[str, Any],
     total_dict: dict[str, Any],
     dicom_dict: dict[str, str],
-    info_dict: dict[str, str],
+    info_dict: dict[str, Any],
 ) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
 
@@ -233,11 +233,13 @@ def get_diagnostic_report(
             "identifier": [
                 {
                     "type": {
-                        "coding": {
-                            "system": "http://dicom.nema.org/resources/ontology/DCM",
-                            "code": "112002",
-                            "display": "SeriesInstanceUID: A unique identifier for a series of DICOM SOP instances",
-                        }
+                        "coding": [
+                            {
+                                "system": "http://dicom.nema.org/resources/ontology/DCM",
+                                "code": "112002",
+                                "display": "SeriesInstanceUID: A unique identifier for a series of DICOM SOP instances",
+                            },
+                        ]
                     },
                     "system": "urn:dicom:uid",
                     "value": dicom_dict["SeriesInstanceUID"],
@@ -246,28 +248,40 @@ def get_diagnostic_report(
             "status": "preliminary",
             "category": [
                 {
-                    "coding": {
-                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/git-hash",
-                        "code": info_dict["BOAGitHash"],
-                    },
+                    "coding": [
+                        {
+                            "system": "https://uk-essen.de/fhir/CodeSystem/boa/git-hash",
+                            "code": info_dict["BOAGitHash"],
+                            "display": "Git Hash",
+                        },
+                    ]
                 },
                 {
-                    "coding": {
-                        "system": "https://uk-essen.de/fhir/CodeSystem/boa/version",
-                        "code": info_dict["BOAVersion"],
-                    },
+                    "coding": [
+                        {
+                            "system": "https://uk-essen.de/fhir/CodeSystem/boa/version",
+                            "code": info_dict["BOAVersion"],
+                            "display": "BOA Version",
+                        },
+                    ]
                 },
                 {
-                    "coding": {
-                        "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/iv-phase",
-                        "code": info_dict["PredictedContrastPhase"],
-                    },
+                    "coding": [
+                        {
+                            "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/iv-phase",
+                            "code": info_dict["PredictedContrastPhase"],
+                            "display": "IV Contrast Phase",
+                        },
+                    ]
                 },
                 {
-                    "coding": {
-                        "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/git",
-                        "code": info_dict["PredictedContrastInGIT"],
-                    },
+                    "coding": [
+                        {
+                            "system": "https://uk-essen.de/fhir/ValueSet/boa/contrast/git",
+                            "code": info_dict["PredictedContrastInGIT"],
+                            "display": "GI Tract Contrast",
+                        },
+                    ]
                 },
             ],
             "code": {
@@ -405,11 +419,13 @@ def get_bsv_observation(
             "component": [
                 {
                     "code": {
-                        "coding": {
-                            "system": "https://uk-essen.de/fhir/ValueSet/boa/body-structure",
-                            "code": total_coding_dict[k],
-                            "display": k,
-                        },
+                        "coding": [
+                            {
+                                "system": "https://uk-essen.de/fhir/ValueSet/boa/body-structure",
+                                "code": total_coding_dict[k],
+                                "display": k,
+                            },
+                        ]
                     },
                     "value": {
                         "value": f"{v['volume_ml']:.2f}" if v["present"] else 0.0,
