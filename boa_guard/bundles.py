@@ -25,36 +25,36 @@ def main(fhir_folder: Path, boa_folder: Path) -> None:
         except (FileNotFoundError, NotADirectoryError) as e:
             logger.error(
                 "An Error occurred while processing the "
-                f"folder '{excel_file.parent}': {type(e).__name__}: {e}"
+                f"folder `{excel_file.parent}`: {type(e).__name__}: {e}"
             )
 
     fhir_folder.mkdir(exist_ok=True)
     with json_output.open("w", encoding="utf-8") as f:
         json.dump(result_dict, f, indent=2)
-    logger.info(f"Successfully created FHIR bundles in '{fhir_folder}'.")
+    logger.info(f"Successfully created FHIR bundles in `{fhir_folder}`.")
 
 
 def create_bundles(excel_path: Path, folder: Path) -> list[dict[str, Any]]:
     json_bca = folder / "bca-measurements.json"
     json_total = folder / "total-measurements.json"
-    dicom_path = folder / "dicoms"
+    dicom_path = next(folder.rglob("*.dcm"), None)
 
     if not json_bca.is_file() or not json_total.is_file():
         raise FileNotFoundError(
-            f"'{json_bca.name}' or '{json_total.name}' is missing in '{folder}'. "
+            f"`{json_bca.name}` or `{json_total.name}` is missing in `{folder}`. "
             "Without the JSON files the FHIR bundles can't be generated for this Patient."
         )
-    elif not dicom_path.is_dir():
-        raise NotADirectoryError(
-            f"Folder '{dicom_path.name}' is missing in '{folder}'. "
-            "Without the DICOM files the FHIR bundles can't be generated for this Patient."
+    if dicom_path is None:
+        raise FileNotFoundError(
+            f"No DICOM files found in `{dicom_path}`. Without the DICOM "
+            "files the FHIR bundles can't be generated for this Patient."
         )
 
     with json_bca.open(encoding="utf-8") as f:
         bca_dict: dict[str, Any] = json.load(f)["aggregated"]
     with json_total.open(encoding="utf-8") as f:
         total_dict: dict[str, Any] = json.load(f)["segmentations"]["total"]
-    dicom_dict = get_dicom_dict(dicom_path)
+    dicom_dict = get_dicom_dict(dicom_path.parent)
     info_dict = get_info_dict(excel_path, json_bca, json_total)
     return to_fhir_bundles(bca_dict, total_dict, dicom_dict, info_dict)
 
@@ -123,9 +123,9 @@ def get_info_dict(excel_path: Path, json_bca: Path, json_total: Path) -> dict[st
     return info_dict
 
 
-def get_dicom_dict(dicom_path: Path) -> dict[str, str]:
+def get_dicom_dict(dicom_dir: Path) -> dict[str, str]:
     dicoms = [
-        pydicom.dcmread(f, stop_before_pixels=True) for f in dicom_path.glob("*.dcm")
+        pydicom.dcmread(f, stop_before_pixels=True) for f in dicom_dir.glob("*.dcm")
     ]
     result: dict[str, Any] = {}
     if not dicoms:

@@ -12,7 +12,7 @@ def main(fhir_folder: Path) -> None:
 
     if not json_bundle.is_file():
         logger.warning(
-            f"FHIR bundles are missing in '{fhir_folder}'. Run "
+            f"FHIR bundles are missing in `{fhir_folder}`. Run "
             "`boa-guard bundles -f FHIR_FOLDER -b BOA_FOLDER` to "
             "generate the FHIR bundles."
         )
@@ -24,7 +24,7 @@ def main(fhir_folder: Path) -> None:
 
     with json_output.open("w", encoding="utf-8") as f:
         json.dump(transaction_dict, f, indent=2)
-    logger.info(f"Successfully created FHIR transactions in '{fhir_folder}'.")
+    logger.info(f"Successfully created FHIR transactions in `{fhir_folder}`.")
 
 
 def create_transactions(bundle_dict: list[dict[str, Any]]) -> dict[str, Any]:

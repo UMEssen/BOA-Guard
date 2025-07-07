@@ -29,13 +29,13 @@ def post_transactions(
     )
 
     if resp.ok:
-        logger.info(f"Successfully pushed FHIR transactions to '{url}'.")
+        logger.info(f"Successfully pushed FHIR transactions to `{url}`.")
     else:
-        logger.error(f"An error occured while pushing FHIR transactions to '{url}'.")
+        logger.error(f"An error occured while pushing FHIR transactions to `{url}`.")
 
     with json_logs.open("w", encoding="utf-8") as f:
         json.dump(resp.json(), f, indent=2)
-    logger.info(f"FHIR response saved in '{json_logs}'.")
+    logger.info(f"FHIR response saved in `{json_logs}`.")
     resp.raise_for_status()
 
 
@@ -46,7 +46,7 @@ def main(fhir_folder: Path) -> None:
 
     if not json_tx.is_file():
         logger.warning(
-            f"FHIR transactions are missing in '{fhir_folder}'. Run "
+            f"FHIR transactions are missing in `{fhir_folder}`. Run "
             "`boa-guard tx -f FHIR_FOLDER` to generate the FHIR bundles."
         )
         return

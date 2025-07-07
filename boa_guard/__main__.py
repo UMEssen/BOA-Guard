@@ -19,7 +19,7 @@ def _resolve_callable(dotted: str) -> Callable[..., Any]:
 def _existing_dir(path_str: str) -> Path:
     path = Path(path_str).expanduser().resolve()
     if not path.is_dir():
-        raise argparse.ArgumentTypeError(f"'{path}' is not an existing directory")
+        raise argparse.ArgumentTypeError(f"`{path}` is not an existing directory")
     return path
 
 
