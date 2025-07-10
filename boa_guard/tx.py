@@ -6,7 +6,8 @@ from typing import Any
 logger = logging.getLogger("boa-guard")
 
 
-def main(fhir_folder: Path) -> None:
+def main(fhir_folder: str | Path) -> None:
+    fhir_folder = Path(fhir_folder)
     json_bundle = fhir_folder / "fhir-bundles.json"
     json_output = fhir_folder / "transaction_bundles.json"
 
