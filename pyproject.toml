@@ -5,7 +5,7 @@ requires = [ "poetry-core>=2,<3" ]
 
 [project]
 name = "boa-guard"
-version = "0.1.1"
+version = "0.1.2"
 description = "Transform BOA results into the corresponding FHIR profiles"
 readme = "README.md"
 authors = [
