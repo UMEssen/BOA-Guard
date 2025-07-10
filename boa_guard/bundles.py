@@ -16,6 +16,8 @@ logger = logging.getLogger("boa-guard")
 
 
 def main(fhir_folder: Path, boa_folder: Path) -> None:
+    fhir_folder = Path(fhir_folder)
+    boa_folder = Path(boa_folder)
     json_output = fhir_folder / "fhir-bundles.json"
     result_dict: list[dict[str, Any]] = []
     # Skip the lock/temp Excel files
@@ -296,7 +298,12 @@ def get_diagnostic_report(
                 "reference": f"Patient/{dicom_dict['PatientID']}",
             },
             "effectiveDateTime": dicom_dict["Effective"],
-            "result": [{"reference": f"Observation/{id}"} for id in observation_ids],
+            "result": [
+                {
+                    "reference": f"Observation/{id}",
+                }
+                for id in observation_ids
+            ],
             "imagingStudy": {
                 "reference": f"ImagingStudy/{image_id}",
             },
@@ -343,7 +350,9 @@ def get_bca_observation(
                         },
                     ]
                 },
-                "subject": {"reference": f"Patient/{dicom_dict['PatientID']}"},
+                "subject": {
+                    "reference": f"Patient/{dicom_dict['PatientID']}",
+                },
                 "effectiveDateTime": dicom_dict["Effective"],
                 "bodySite": {
                     "coding": [
@@ -354,7 +363,9 @@ def get_bca_observation(
                         },
                     ]
                 },
-                "derivedFrom": dicom_dict["ImageID"],
+                "derivedFrom": {
+                    "reference": f"ImagingStudy/{dicom_dict['ImageID']}",
+                },
                 "component": [
                     {
                         "code": {
@@ -413,9 +424,13 @@ def get_bsv_observation(
         "Observation": {
             "id": generate_hash(32),
             "status": "preliminary",
-            "subject": {"reference": f"Patient/{dicom_dict['PatientID']}"},
+            "subject": {
+                "reference": f"Patient/{dicom_dict['PatientID']}",
+            },
             "effectiveDateTime": dicom_dict["Effective"],
-            "derivedFrom": dicom_dict["ImageID"],
+            "derivedFrom": {
+                "reference": f"ImagingStudy/{dicom_dict['ImageID']}",
+            },
             "component": [
                 {
                     "code": {

@@ -1,5 +1,7 @@
 # BOA-Guard
 
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+
 A simple and easy to use python package which enables the transformation
 of BOA results into the corresponding FHIR profiles.
 
@@ -12,8 +14,6 @@ git clone https://github.com/UMEssen/BOA-Guard.git
 cd BOA-Guard
 pip install -e .
 ```
-
-*Requires **Python ≥ 3.10***
 
 ---
 
@@ -41,13 +41,13 @@ export FHIR_PWD=TODO
 ## Quick start
 
 ```bash
-# Generate FHIR bundles from a BOA folder
+# 1. Generate FHIR bundles from a BOA folder
 boa-guard bundles -f FHIR_FOLDER -b BOA_FOLDER
 
-# Turn bundles into a single FHIR Transaction
+# 2. Turn bundles into a single FHIR Transaction
 boa-guard tx -f FHIR_FOLDER
 
-# POST the Transaction to a FHIR server
+# 3. POST the Transaction to a FHIR server
 boa-guard push -f FHIR_FOLDER
 ```
 
@@ -56,3 +56,24 @@ boa-guard push -f FHIR_FOLDER
 | `bundles` | Convert BOA JSON output into a FHIR Bundle     |
 | `tx`      | Convert FHIR Bundle into a Transaction Bundle  |
 | `push`    | Upload (POST) the Transaction to a FHIR server |
+
+---
+
+## Usage in Python
+
+You can also use BOA-Guard as a Python library:
+
+```py
+from boa_guard.bundles import main as bundles
+from boa_guard.tx import main as tx
+from boa_guard.push import main as push
+
+# 1. Generate FHIR bundles from a BOA folder
+bundles("/path/to/fhir_folder", "/path/to/boa_folder")
+
+# 2. Turn bundles into a single FHIR Transaction
+tx("/path/to/fhir_folder")
+
+# 3. POST the Transaction to a FHIR server
+push("/path/to/fhir_folder")
+```

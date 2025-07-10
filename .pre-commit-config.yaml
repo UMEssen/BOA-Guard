@@ -37,8 +37,8 @@ repos:
   - repo: local
     hooks:
       - id: poetry-export
-        name: Export requirements.txt with Poetry
-        entry: poetry export -f requirements.txt --without-hashes --without-urls --without dev -o requirements.txt
+        name: poetry-export
+        entry: poetry export -f requirements.txt --without-hashes --without-urls --only main -o requirements.txt
         language: system
         pass_filenames: false
 
