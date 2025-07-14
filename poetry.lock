@@ -2162,4 +2162,4 @@ dev = ["poetry-plugin-export", "pre-commit", "pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "ef18b6abfc6ef1e320b454db95d7b32dabedf82da5b5b632acdcfa95d3481f00"
+content-hash = "9e5102e3351bf783903e4f59449321e5ce87410c19442a1af7440d41fc0faa0b"

@@ -9,9 +9,9 @@ import pandas as pd
 import pydicom
 import pytz
 
+from boa_guard.fmx.lookup import patient_lookup
 from boa_guard.mapping_dict import mapping_dict
 from boa_guard.utils import generate_hash
-from boa_guard.fmx.lookup import patient_lookup
 
 logger = logging.getLogger("boa-guard")
 

@@ -8,6 +8,7 @@ from psycopg2.extensions import connection
 
 logger = logging.getLogger("boa-guard")
 
+
 class SQL_Class:
     def __init__(self) -> None:
         self.connection: connection | None = None
@@ -48,5 +49,6 @@ class SQL_Class:
     def __del__(self) -> None:
         if self.connection:
             self.connection.close()
+
 
 SQL = SQL_Class()
