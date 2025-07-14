@@ -11,6 +11,7 @@ import pytz
 
 from boa_guard.mapping_dict import mapping_dict
 from boa_guard.utils import generate_hash
+from boa_guard.fmx.lookup import patient_lookup
 
 logger = logging.getLogger("boa-guard")
 
@@ -154,6 +155,10 @@ def get_dicom_dict(dicom_dir: Path) -> dict[str, str]:
             result[key] = str(value)
         except Exception:
             result[key] = None
+    # PatientID
+    medico_id = result["PatientID"]
+    result["MedicoID"] = medico_id
+    result["PatientID"] = patient_lookup(medico_id)
     # ImageID
     if (
         result["StudyInstanceUID"] is not None

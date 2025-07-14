@@ -26,6 +26,7 @@ dependencies = [
   "python-dotenv>=1.1,<2",
   "pytz>=2025.2,<2026",
   "requests>=2.32.4,<3",
+  "psycopg2-binary (>=2.9.10,<3.0.0)",
 ]
 
 optional-dependencies.dev = [
