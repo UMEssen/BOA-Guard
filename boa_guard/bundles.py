@@ -45,7 +45,8 @@ def create_bundles(excel_path: Path, folder: Path) -> list[dict[str, Any]]:
     if not json_bca.is_file() or not json_total.is_file():
         raise FileNotFoundError(
             f"`{json_bca.name}` or `{json_total.name}` is missing in `{folder}`. "
-            "Without the JSON files the FHIR bundles can't be generated for this Patient."
+            "Without the JSON files the FHIR bundles can't be generated for this "
+            "Patient."
         )
     if dicom_path is None:
         raise FileNotFoundError(
